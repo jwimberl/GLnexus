@@ -40,14 +40,14 @@ TEST_CASE("cli") {
             gvcfs.push_back(basedir + "/" + fname);
         }
 
-        // empty range, so that all records will be loaded into the database
-        vector<range> ranges;
-        s = cli::utils::db_bulk_load(console, 0, nr_threads, gvcfs, DB_PATH, ranges, contigs);
+        // empty BED filename, so that all records will be loaded into the database
+        std::string emptybed = "";
+        s = cli::utils::db_bulk_load(console, 0, nr_threads, gvcfs, DB_PATH, emptybed, contigs);
         REQUIRE(s.ok());
         REQUIRE(contigs.size() >= 1);
 
         // construct ranges that cover the entire contig set
-        ranges.clear();
+        vector<range> ranges {};
         for (int rid=0; rid < contigs.size(); rid++) {
             size_t len = contigs[rid].second;
             ranges.push_back(range(rid, 0, len));

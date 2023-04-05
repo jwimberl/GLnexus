@@ -81,10 +81,8 @@ static int all_steps(const vector<string> &vcf_files,
     // Load the GVCFs into the database
     unique_ptr<GLnexus::KeyValue::DB> db;
     {
-        // use an empty range filter
-        vector<GLnexus::range> ranges;
         H("bulk load into DB",
-          GLnexus::cli::utils::db_bulk_load(console, mem_budget, nr_threads, vcf_files, dbpath, ranges, contigs, &db, false));
+          GLnexus::cli::utils::db_bulk_load(console, mem_budget, nr_threads, vcf_files, dbpath, bedfilename, contigs, &db, false));
     }
     assert(db);
 

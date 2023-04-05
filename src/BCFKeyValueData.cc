@@ -911,15 +911,10 @@ static Status bulk_insert_gvcf_key_values(BCFBucketRange& rangeHelper,
                                           KeyValue::DB* db,
                                           const string& dataset,
                                           const string& filename,
-                                          const set<range>& range_filter,
-                                          const bcf_hdr_t *hdr,
-                                          vcfFile *vcf,
+                                          BcfReader& vcf,
                                           BCFKeyValueData::import_result& rslt) {
     Status s;
     BulkInsertBuffer buffer(*db);
-    unique_ptr<bcf1_t, void(*)(bcf1_t*)> vt(bcf_init(), &bcf_destroy);
-    int prev_pos = -1;
-    int prev_rid = -1;
     vector<shared_ptr<bcf1_t>> danglers;
     unsigned int danglers_written_to_current_bucket = 0;
     // current bucket
@@ -929,27 +924,36 @@ static Status bulk_insert_gvcf_key_values(BCFBucketRange& rangeHelper,
     KeyValue::CollectionHandle coll_bcf;
     S(db->collection("bcf", coll_bcf));
 
+    // Check for reading/parsing errors
+    if (vcf.errnum()) {
+        return Status::IOError("reading from gVCF file", vcf.errstr());
+    }
+
     // scan the BCF records
-    int c;
-    for(c = bcf_read(vcf, hdr, vt.get());
-        c == 0 && vt->errcode == 0;
-        c = bcf_read(vcf, hdr, vt.get())) {
-        range vt_rng(vt.get());
-        last_range = vt_rng;
-        if (!range_filter.empty()) {
-            // Test range filter if applicable. It would be nice to use a
-            // tabix index instead.
-            if (all_of(range_filter.begin(), range_filter.end(),
-                       [&vt_rng](const range& r) { return !r.overlaps(vt_rng); })) {
-                continue;
+    int prev_pos = -1;
+    int prev_rid = -1;
+    while (vcf.next()) {
+
+        // Get line; check for errors
+        bcf1_t* vt = vcf.get_line();
+        if (vt->errcode != 0) {
+            ostringstream msg;
+            msg << filename << " bcf1_t::errcode = " << vt->errcode;
+            if (last_range.rid >= 0) {
+                msg << "; after " <<  last_range.str(metadata.contigs());
             }
+            return Status::IOError("reading from gVCF file", msg.str());
         }
+
+        // Get new range (for non-sequential overlap testing)
+        range vt_rng(vt);
+        last_range = vt_rng;
 
         // Check various aspects of the record's validity; e.g. make sure the
         // records are coordinate sorted. May also indicate we should just drop
         // the record for various reasons.
         bool skip_ingestion = false;
-        S(validate_bcf(metadata.contigs(), filename, hdr, vt.get(), prev_rid, prev_pos, skip_ingestion));
+        S(validate_bcf(metadata.contigs(), filename, vcf.get_header(), vt, prev_rid, prev_pos, skip_ingestion));
         if (skip_ingestion) {
             rslt.skipped_records++;
             continue;
@@ -960,7 +964,7 @@ static Status bulk_insert_gvcf_key_values(BCFBucketRange& rangeHelper,
             // write old bucket K to DB
             S(write_bucket(rangeHelper, buffer, coll_bcf, writer, danglers_written_to_current_bucket,
                            dataset, bucket, rslt));
-            range next_bucket = rangeHelper.bucket(vt.get());
+            range next_bucket = rangeHelper.bucket(vt);
             S(write_danglers_between(rangeHelper, buffer, coll_bcf, dataset, bucket, rslt,
                                      danglers, next_bucket));
             bucket = next_bucket;
@@ -973,40 +977,34 @@ static Status bulk_insert_gvcf_key_values(BCFBucketRange& rangeHelper,
             write_danglers_to_in_mem_bucket(danglers, writer, next_bucket);
         }
         // write the record into the bucket
-        S(writer.add(vt.get()));
+        S(writer.add(vt));
         // if it dangles off the end of the bucket, add it to danglers for
         // inclusion in the next bucket
-        if (range(vt.get()).end > bucket.end) {
+        if (range(vt).end > bucket.end) {
             auto dangler = shared_ptr<bcf1_t>(bcf_init(), &bcf_destroy);
-            bcf_copy(dangler.get(), vt.get());
-            assert(range(dangler.get()) == range(vt.get()));
+            bcf_copy(dangler.get(), vt);
+            assert(range(dangler.get()) == range(vt));
             danglers.push_back(dangler);
         }
         prev_rid = vt->rid;
         prev_pos = vt->pos;
     }
-    if (vt->errcode != 0) {
-        ostringstream msg;
-        msg << filename << " bcf1_t::errcode = " << vt->errcode;
-        if (last_range.rid >= 0) {
-            msg << "; after " <<  last_range.str(metadata.contigs());
-        }
-        return Status::IOError("reading from gVCF file", msg.str());
+
+    if (vcf.errnum()) {
+        return Status::IOError("reading from gVCF file", vcf.errstr());
     }
-    if (c != -1) return Status::IOError("reading from gVCF file", filename);
 
     // write out last bucket
     S(write_bucket(rangeHelper, buffer, coll_bcf, writer, danglers_written_to_current_bucket,
                     dataset, bucket, rslt));
 
     // write any last danglers
-    range end_bucket = rangeHelper.bucket_at_end_of_chrom(vt->rid, metadata.contigs());
+    range end_bucket = rangeHelper.bucket_at_end_of_chrom(prev_rid, metadata.contigs());
     S(write_danglers_between(rangeHelper, buffer, coll_bcf, dataset, bucket, rslt,
                              danglers, end_bucket));
 
     return buffer.flush();
 }
-
 
 // Temporary notes on DB schema, to be moved over to wiki.
 //
@@ -1019,16 +1017,21 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
                                 MetadataCache& metadata,
                                 const string& dataset,
                                 const string& filename,
-                                const set<range>& range_filter,
+                                const string& bedfilename,
                                 BCFKeyValueData::import_result& rslt) {
     Status s;
-    unique_ptr<vcfFile, void(*)(vcfFile*)> vcf(bcf_open(filename.c_str(), "r"),
-                                               [](vcfFile* f) { bcf_close(f); });
-    if (!vcf) return Status::IOError("opening gVCF file", filename);
-    unique_ptr<bcf_hdr_t, void(*)(bcf_hdr_t*)> hdr(bcf_hdr_read(vcf.get()), &bcf_hdr_destroy);
+    
+    BcfReader vcf {};
+    try {
+        if (!bedfilename.empty()) {
+            vcf.set_regions(bedfilename);
+        }
+        vcf.add_reader(filename);
+    } catch(std::exception& e) {
+        return Status::IOError("opening gVCF file" , filename + " -- " + e.what() + " -- " + vcf.errstr());
+    }
 
-    S(vcf_validate_basic_facts(metadata, dataset, filename, hdr.get(), vcf.get(),
-                               rslt.samples));
+    S(vcf_validate_basic_facts(metadata, dataset, filename, vcf, rslt.samples));
 
     // Atomically verify metadata and prepare
     {
@@ -1055,8 +1058,7 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
     //
     // Note: we are not dealing at all with mid-flight failures
     S(bulk_insert_gvcf_key_values(*body_->rangeHelper, metadata, body_->db,
-                                  dataset, filename, range_filter,
-                                  hdr.get(), vcf.get(), rslt));
+                                  dataset, filename, vcf, rslt));
 
     // Update metadata atomically, now it will point to all the data
     Status retval = Status::Invalid();
@@ -1064,7 +1066,7 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
         std::lock_guard<std::mutex> lock(body_->mutex);
 
         // Serialize header into a string
-        string hdr_data = bcf_write_header(hdr.get());
+        string hdr_data = bcf_write_header(vcf.get_header());
 
         // Get collection handles and current * sample set version number
         KeyValue::CollectionHandle coll_header, coll_sample_dataset, coll_sampleset;
@@ -1105,7 +1107,7 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
 Status BCFKeyValueData::import_gvcf(MetadataCache& metadata,
                                     const string& dataset,
                                     const string& filename,
-                                    const set<range>& range_filter,
+                                    const string& bedfilename,
                                     import_result& rslt) {
     rslt = import_result(); // hygiene
 
@@ -1117,7 +1119,7 @@ Status BCFKeyValueData::import_gvcf(MetadataCache& metadata,
                                  metadata,
                                  dataset,
                                  filename,
-                                 range_filter,
+                                 bedfilename,
                                  rslt);
 
     if (!s.ok()) {

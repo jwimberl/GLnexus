@@ -558,8 +558,8 @@ TEST_CASE("iter_compare") {
     for (auto fname : {"F1.gvcf.gz", "F2.gvcf.gz"}) {
          gvcfs.push_back(basedir + "/" + fname);
     }
-    vector<range> ranges;
-    s = cli::utils::db_bulk_load(console,  0, 8, gvcfs, dbpath, ranges, contigs);
+    std::string emptybed = "";
+    s = cli::utils::db_bulk_load(console,  0, 8, gvcfs, dbpath, emptybed, contigs);
     REQUIRE(s.ok());
     REQUIRE(contigs.size() >= 1);
 

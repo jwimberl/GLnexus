@@ -117,7 +117,7 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
                     size_t mem_budget, size_t nr_threads,
                     const std::vector<std::string> &gvcfs,
                     const std::string &dbpath,
-                    const std::vector<range> &ranges,   // limit the bulk load to these ranges
+                    const std::string &bedfilename,
                     std::vector<std::pair<std::string,size_t>> &contigs, // output param
                     std::unique_ptr<KeyValue::DB> *db_out = nullptr, // if supplied, return db ptr (after flush)
                     bool delete_gvcf_after_load = false);

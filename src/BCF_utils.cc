@@ -189,9 +189,10 @@ Status validate_bcf(const std::vector<std::pair<std::string, size_t> > &contigs,
 
 Status vcf_validate_basic_facts(MetadataCache &metadata,
                                 const std::string &dataset,
-                                const std::string &filename, bcf_hdr_t *hdr,
-                                vcfFile *vcf,
+                                const std::string &filename,
+                                const BcfReader& vcf,
                                 std::set<std::string> &samples_out) {
+  bcf_hdr_t *hdr = vcf.get_header();
   if (!hdr) return Status::IOError("reading gVCF header", filename);
   if (!gvcf_compatible(metadata, hdr)) {
     return Status::Invalid(

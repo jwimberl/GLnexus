@@ -413,8 +413,8 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
         REQUIRE(MetadataCache::Start(*data, cache).ok());
 
         BCFKeyValueData::import_result rslt;
-        Status s = data->import_gvcf(*cache, "1", "test/data/discover_alleles_trio1.vcf",
-                                     {range(1, 1000, 1010), range(2, 0, 1000000000)}, rslt);
+        Status s = data->import_gvcf(*cache, "1", "test/data/discover_alleles_trio1.vcf.gz",
+                                     "test/data/discover_alleles_trio1.regions", rslt);
         REQUIRE(s.ok());
         REQUIRE(rslt.samples == (set<string>({"trio1.fa", "trio1.mo", "trio1.ch"})));
         REQUIRE(rslt.records == 3);
@@ -1452,7 +1452,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf input validation") {
     // bad # of samples / truncated record
     s = data->import_gvcf(*cache, "bad_nsample", "test/data/bad_nsample.gvcf", samples_imported);
     REQUIRE(s.bad());
-    REQUIRE(s.str().find("errcode") != string::npos);
+    REQUIRE(s.str().find("VCF parse error") != string::npos);
 }
 
 TEST_CASE("BCFKeyValueData NA12878 import and query") {

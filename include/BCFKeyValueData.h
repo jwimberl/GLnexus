@@ -114,14 +114,15 @@ public:
     /// of those ranges.
     Status import_gvcf(MetadataCache& metadata, const std::string& dataset,
                        const std::string& filename,
-                       const std::set<range>& range_filter,
+                       const std::string& bedfilename,
                        import_result& rslt);
 
     Status import_gvcf(MetadataCache& metadata, const std::string& dataset,
                        const std::string& filename,
                        std::set<std::string>& samples_imported) {
         import_result rslt;
-        Status s = import_gvcf(metadata, dataset, filename, {}, rslt);
+        std::string empty_bedfile = "";
+        Status s = import_gvcf(metadata, dataset, filename, empty_bedfile, rslt);
         samples_imported = move(rslt.samples);
         return s;
     }

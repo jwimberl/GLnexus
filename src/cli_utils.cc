@@ -1387,7 +1387,7 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
                     size_t mem_budget, size_t nr_threads,
                     const vector<string> &gvcfs,
                     const string &dbpath,
-                    const vector<range> &ranges_i,
+                    const string &bedfilename,
                     std::vector<std::pair<std::string,size_t> > &contigs, // output param
                     std::unique_ptr<KeyValue::DB> *db_out, // output
                     bool delete_gvcf_after_load) {
@@ -1396,10 +1396,6 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
     if (nr_threads == 0) {
         nr_threads = std::thread::hardware_concurrency();
     }
-
-    set<range> ranges;
-    for (auto &r : ranges_i)
-        ranges.insert(r);
 
     // open the database
     RocksKeyValue::config cfg;
@@ -1415,16 +1411,6 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
     unique_ptr<MetadataCache> metadata;
     S(MetadataCache::Start(*data, metadata));
     contigs = metadata->contigs();
-
-     if (ranges.size()) {
-        ostringstream ss;
-        for (const auto& rng : ranges) {
-            ss << " " << rng.str(contigs);
-        }
-        logger->info("Beginning bulk load of records overlapping: {}", ss.str());
-    } else {
-        logger->info("Beginning bulk load with no range filter.");
-    }
 
     ctpl::thread_pool threadpool(nr_threads);
     vector<future<Status>> statuses;
@@ -1453,7 +1439,7 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
 
         auto fut = threadpool.push([&, gvcf, dataset](int tid) {
                 BCFKeyValueData::import_result rslt;
-                Status ls = data->import_gvcf(*metadata, dataset, gvcf, ranges, rslt);
+                Status ls = data->import_gvcf(*metadata, dataset, gvcf, bedfilename, rslt);
                 if (ls.ok()) {
                     if (delete_gvcf_after_load && unlink(gvcf.c_str())) {
                         logger->warn("Loaded {} successfully, but failed deleting it afterwards.", gvcf);
