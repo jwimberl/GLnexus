@@ -564,14 +564,14 @@ TEST_CASE("BCFKeyValueData BCF retrieval") {
 
         REQUIRE(records.size() == 5);
 
-        REQUIRE(records[0]->pos == 10009461);
+        REQUIRE(records[0]->pos == 10009461L);
         REQUIRE(records[1]->rlen == 2);
         REQUIRE(records[0]->n_allele == 2);
         REQUIRE(string(records[0]->d.allele[0]) == "T");
         REQUIRE(string(records[0]->d.allele[1]) == "<NON_REF>");
         REQUIRE(bcf_get_info(hdr.get(), records[0].get(), "END")->v1.i == 10009463); // nb END stays 1-based!
 
-        REQUIRE(records[1]->pos == 10009463);
+        REQUIRE(records[1]->pos == 10009463L);
         REQUIRE(records[1]->rlen == 2);
         REQUIRE(records[1]->n_allele == 3);
         REQUIRE(string(records[1]->d.allele[0]) == "TA");
@@ -580,7 +580,7 @@ TEST_CASE("BCFKeyValueData BCF retrieval") {
 
         REQUIRE(records[2]->rlen == 1);
 
-        REQUIRE(records[4]->pos == 10009468);
+        REQUIRE(records[4]->pos == 10009468L);
         REQUIRE(records[4]->n_allele == 2);
         REQUIRE(string(records[4]->d.allele[0]) == "A");
         REQUIRE(string(records[4]->d.allele[1]) == "<NON_REF>");
@@ -592,13 +592,13 @@ TEST_CASE("BCFKeyValueData BCF retrieval") {
 
         REQUIRE(records.size() == 2);
 
-        REQUIRE(records[0]->pos == 10009463);
+        REQUIRE(records[0]->pos == 10009463L);
         REQUIRE(records[0]->n_allele == 3);
         REQUIRE(string(records[0]->d.allele[0]) == "TA");
         REQUIRE(string(records[0]->d.allele[1]) == "T");
         REQUIRE(string(records[0]->d.allele[2]) == "<NON_REF>");
 
-        REQUIRE(records[1]->pos == 10009465);
+        REQUIRE(records[1]->pos == 10009465L);
         REQUIRE(records[1]->n_allele == 2);
         REQUIRE(string(records[1]->d.allele[0]) == "A");
         REQUIRE(string(records[1]->d.allele[1]) == "<NON_REF>");
@@ -612,7 +612,7 @@ TEST_CASE("BCFKeyValueData BCF retrieval") {
         REQUIRE(s.ok());
         REQUIRE(records.size() == 1);
 
-        REQUIRE(records[0]->pos == 10009463);
+        REQUIRE(records[0]->pos == 10009463L);
         REQUIRE(records[0]->n_allele == 3);
         REQUIRE(string(records[0]->d.allele[0]) == "TA");
         REQUIRE(string(records[0]->d.allele[1]) == "T");
@@ -740,7 +740,7 @@ TEST_CASE("BCFKeyValueData long_confidence_intervals") {
         s = data->dataset_range("long_ref", hdr.get(), range(0, 1020, 1030), nullptr, &records);
         REQUIRE(s.ok());
         REQUIRE(records.size() == 1);
-        REQUIRE(records[0]->pos == 1016);
+        REQUIRE(records[0]->pos == 1016L);
         REQUIRE(records[0]->n_allele == 2);
         REQUIRE(string(records[0]->d.allele[0]) == "A");
         REQUIRE(string(records[0]->d.allele[1]) == "<NON_REF>");
@@ -748,7 +748,7 @@ TEST_CASE("BCFKeyValueData long_confidence_intervals") {
         s = data->dataset_range("long_ref", hdr.get(), range(0, 2100, 2900), nullptr, &records);
         REQUIRE(s.ok());
         REQUIRE(records.size() == 1);
-        REQUIRE(records[0]->pos == 2009);
+        REQUIRE(records[0]->pos == 2009L);
         REQUIRE(string(records[0]->d.allele[0]) == "C");
 
         // Several records are supposed to appear
@@ -818,13 +818,13 @@ TEST_CASE("BCFKeyValueData long_confidence_intervals 2") {
         s = data->dataset_range("B", hdr.get(), range(0, 5000, 5010), nullptr, &records);
         REQUIRE(s.ok());
         REQUIRE(records.size() == 2);
-        REQUIRE(records[0]->pos == 3198);
+        REQUIRE(records[0]->pos == 3198L);
         REQUIRE(string(records[0]->d.allele[0]) == "C");
 
         s = data->dataset_range("B", hdr.get(), range(0, 6000, 6005), nullptr, &records);
         REQUIRE(s.ok());
         REQUIRE(records.size() == 1);
-        REQUIRE(records[0]->pos == 4002);
+        REQUIRE(records[0]->pos == 4002L);
         REQUIRE(string(records[0]->d.allele[0]) == "C");
 
         s = data->dataset_range("B", hdr.get(), range(0, 8000, 10000), nullptr, &records);
@@ -1527,7 +1527,7 @@ TEST_CASE("BCFKeyValueData NA12878 import and query") {
         auto fut = threadpool.push([&, i](int tid){
             Status ls;
             auto qrec = all_chr17[rand() % all_chr17.size()];
-            int lo = max(0, qrec->pos - (rand() % 10));
+            int lo = max(0L, qrec->pos - (rand() % 10));
             int hi = lo+(rand()%10)+1;
             range q(16, lo, hi);
 

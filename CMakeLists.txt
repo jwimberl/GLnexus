@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.10)
 include(ExternalProject)
 
 IF(NOT CMAKE_BUILD_TYPE)
@@ -39,12 +39,16 @@ LINK_DIRECTORIES(${CMAKE_BINARY_DIR}/external/lib)
 SET(ENV{PATH} ${CMAKE_BINARY_DIR}/external/bin:$ENV{PATH})
 SET(ENV{PKG_CONFIG_PATH} ${CMAKE_BINARY_DIR}/external/lib/pkgconfig)
 
+# ssl, threads
+find_package(OpenSSL REQUIRED)
+find_package(Threads)
+
 # After build, double-check external/src/htslib-stamp/htslib-build-out.log
 # to make sure CFLAGS were set as expected
 ExternalProject_Add(htslib
-    URL https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
+    URL https://github.com/samtools/htslib/releases/download/1.14/htslib-1.14.tar.bz2
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ""
+    CONFIGURE_COMMAND ./configure --prefix=${CMAKE_BINARY_DIR}/external --enable-libcurl --enable-plugins --with-plugin-dir=${CMAKE_BINARY_DIR} --enable-s3
     PATCH_COMMAND sed -i "s/^CFLAGS .*$/CFLAGS = -gdwarf -O3 -DNDEBUG -march=ivybridge/" Makefile
     BUILD_IN_SOURCE 1
     BUILD_COMMAND bash -c "make -n && make -j$(nproc)"
@@ -174,7 +178,7 @@ ExternalProject_Add(capnp
 
 execute_process(COMMAND git describe --tags --long --dirty --always
                 OUTPUT_VARIABLE GIT_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGIT_REVISION=\"\\\"${GIT_REVISION}\\\"\" -pthread -std=c++14 -Wall -Werror=return-type -Werror=unused-result -Wno-sign-compare -Wno-write-strings -Wno-terminate -fdiagnostics-color=auto -march=ivybridge")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGIT_REVISION=\"\\\"${GIT_REVISION}\\\"\" -std=c++14 -Wall -Werror=return-type -Werror=unused-result -Wno-sign-compare -Wno-write-strings -Wno-terminate -fdiagnostics-color=auto -march=ivybridge")
 set(CMAKE_CXX_FLAGS_RELEASE "-gdwarf -DNDEBUG -O3")
 
 ################################
@@ -222,11 +226,11 @@ add_dependencies(glnexus spdlog)
 add_dependencies(glnexus capnp)
 add_library(libglnexus ALIAS glnexus)
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=ivybridge -static-libstdc++ -pthread")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=ivybridge -static-libstdc++")
 
 add_executable(glnexus_cli cli/glnexus_cli.cc)
 add_dependencies(glnexus_cli libglnexus)
-target_link_libraries(glnexus_cli glnexus libhts librocksdb libyaml-cpp libz.a libsnappy.a libbz2.a libzstd.a liblzma.a librt.a libcapnp.a libkj.a)
+target_link_libraries(glnexus_cli PRIVATE glnexus libhts librocksdb libyaml-cpp libz.a libsnappy.a libbz2.a libzstd.a liblzma.a librt.a libcapnp.a libkj.a OpenSSL::SSL ${CMAKE_DL_LIBS} Threads::Threads)
 
 install(TARGETS glnexus_cli DESTINATION bin)
 
@@ -262,7 +266,7 @@ add_executable(unit_tests
                 test/cli.cc)
 add_dependencies(unit_tests catch)
 add_dependencies(unit_tests libglnexus)
-target_link_libraries(unit_tests glnexus libhts librocksdb libyaml-cpp libz.a libsnappy.a libbz2.a libzstd.a liblzma.a librt.a libcapnp.a libkj.a)
+target_link_libraries(unit_tests PRIVATE glnexus libhts librocksdb libyaml-cpp libz.a libsnappy.a libbz2.a libzstd.a liblzma.a librt.a libcapnp.a libkj.a OpenSSL::SSL ${CMAKE_DL_LIBS} Threads::Threads)
 
 include(CTest)
 add_test(NAME unit_tests COMMAND ./unit_tests -d yes)

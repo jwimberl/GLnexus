@@ -145,7 +145,7 @@ TEST_CASE("htslib VCF header chrom injection") {
 
     // inject
     bcf_hdr_append(hdr,"##contig=<ID=21,length=1000000>");
-    bcf_hdr_sync(hdr);
+    int sret = bcf_hdr_sync(hdr);
 
     // read another record - we shouldn't get the error code
     vt->errcode = 0;
@@ -165,7 +165,7 @@ TEST_CASE("htslib VCF header synthesis") {
     REQUIRE(bcf_hdr_add_sample(hdr.get(),"mo") == 0);
     REQUIRE(bcf_hdr_add_sample(hdr.get(),"ch") == 0);
 
-    bcf_hdr_sync(hdr.get());
+    int sret = bcf_hdr_sync(hdr.get());
 
     int ncontigs = 0;
     const char **contignames = bcf_hdr_seqnames(hdr.get(), &ncontigs);
@@ -201,7 +201,7 @@ TEST_CASE("DNAnexus VCF/BCF serialization") {
     vector<shared_ptr<bcf1_t>> records;
 
     bcf_hdr_append(hdr,"##contig=<ID=21,length=1000000>");
-    bcf_hdr_sync(hdr);
+    int sret = bcf_hdr_sync(hdr);
 
     do {
         if (vt) {
@@ -337,7 +337,7 @@ TEST_CASE("Ensure uncompressed BCF encoding remains consistent") {
         bcf_hdr_append(hdr.get(), "##FORMAT=<ID=UF,Number=1,Type=Integer,Description=\"Unused FORMAT\">");
         bcf_hdr_add_sample(hdr.get(), "NA00001");
         bcf_hdr_add_sample(hdr.get(), NULL);      // to update internal structures
-        bcf_hdr_write(fp, hdr.get());
+        int wret = bcf_hdr_write(fp, hdr.get());
 
         REQUIRE(hts_get_format(fp)->compression == no_compression);
         //REQUIRE(hts_get_format(fp)->format == bcf);
@@ -347,7 +347,7 @@ TEST_CASE("Ensure uncompressed BCF encoding remains consistent") {
 
         // write to the file
         for (const auto& rec : records) {
-            bcf_write1(fp, hdr.get(), rec.get());
+            int wret1 = bcf_write1(fp, hdr.get(), rec.get());
         }
 
         // note: the file is now closed, we can read it in the next phase.
