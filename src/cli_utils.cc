@@ -14,6 +14,7 @@
 #include "compare_queries.h"
 #include "spdlog/sinks/null_sink.h"
 
+#include "BCF_utils.h"
 #include "BCFKeyValueData.h"
 
 // This file has utilities employed by the glnexus applet.
@@ -1310,17 +1311,16 @@ Status db_init(std::shared_ptr<spdlog::logger> logger,
     }
 
     // load exemplar contigs
-    unique_ptr<vcfFile, void(*)(vcfFile*)> vcf(bcf_open(exemplar_gvcf.c_str(), "r"),
-                                               [](vcfFile* f) { bcf_close(f); });
-    if (!vcf) {
-        return Status::IOError("Failed to open exemplar gVCF file at ", exemplar_gvcf);
+    BcfReader exemplar {};
+    try {
+        exemplar.add_reader(exemplar_gvcf);
+    } catch(std::exception& e) {
+        return Status::IOError("Failed to open exemplar gVCF file at" , exemplar_gvcf + " -- " + e.what() + " -- " + exemplar.errstr());
     }
-    unique_ptr<bcf_hdr_t, void(*)(bcf_hdr_t*)> hdr(bcf_hdr_read(vcf.get()), &bcf_hdr_destroy);
-    if (!hdr) {
-        return Status::IOError("Failed to read gVCF file header from", exemplar_gvcf);
-    }
+    bcf_hdr_t* hdr = exemplar.get_header();
+
     int ncontigs = 0;
-    const char **contignames = bcf_hdr_seqnames(hdr.get(), &ncontigs);
+    const char **contignames = bcf_hdr_seqnames(hdr, &ncontigs);
     bool dummy_length = false;
     for (int i = 0; i < ncontigs; i++) {
         if (hdr->id[BCF_DT_CTG][i].val == nullptr) {
