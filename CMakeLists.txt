@@ -46,7 +46,7 @@ find_package(Threads)
 # After build, double-check external/src/htslib-stamp/htslib-build-out.log
 # to make sure CFLAGS were set as expected
 ExternalProject_Add(htslib
-    URL https://github.com/samtools/htslib/releases/download/1.14/htslib-1.14.tar.bz2
+    URL https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
     CONFIGURE_COMMAND ./configure --prefix=${CMAKE_BINARY_DIR}/external --enable-libcurl --enable-plugins --with-plugin-dir=${CMAKE_BINARY_DIR} --enable-s3
     PATCH_COMMAND sed -i "s/^CFLAGS .*$/CFLAGS = -gdwarf -O3 -DNDEBUG -march=ivybridge/" Makefile
@@ -60,9 +60,9 @@ ExternalProject_Get_Property(htslib source_dir)
 set(HTSLIB_INCLUDE_DIR ${source_dir}/htslib)
 include_directories(${HTSLIB_INCLUDE_DIR})
 ExternalProject_Get_Property(htslib binary_dir)
-add_library(libhts STATIC IMPORTED)
-set(LIBHTS_A ${binary_dir}/libhts.a)
-set_property(TARGET libhts PROPERTY IMPORTED_LOCATION ${LIBHTS_A})
+add_library(libhts SHARED IMPORTED)
+set(LIBHTS_SO ${binary_dir}/libhts.so)
+set_property(TARGET libhts PROPERTY IMPORTED_LOCATION ${LIBHTS_SO})
 
 # RocksDB
 #
