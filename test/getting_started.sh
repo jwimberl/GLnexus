@@ -15,6 +15,10 @@ fi
 
 rm -rf /tmp/dv_1000G_ALDH2_gvcf/ GLnexus.DB/
 tar xf /tmp/dv_1000G_ALDH2_gvcf.tar -C /tmp
+# create tbi files 
+for f in /tmp/dv_1000G_ALDH2_gvcf/*.vcf.gz; do
+    $HERE/../external/src/htslib/tabix -p vcf $f;
+done
 
 export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so  # needed to keep memory usage under control in Travis CI
 echo -e "chr12\t111760000\t111820000" > /tmp/dv_1000G_ALDH2_gvcf/ALDH2.bed
