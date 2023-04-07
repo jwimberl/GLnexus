@@ -39,6 +39,7 @@ GLnexus::Status s;
 // return 0 on success, 1 on failure.
 static int all_steps(const vector<string> &vcf_files,
                      const string &bedfilename,
+                     const string &rangefilename,
                      const string &dbpath,
                      const string &config_name,
                      bool more_PL, bool squeeze, bool trim_uncalled_alleles,
@@ -93,13 +94,13 @@ static int all_steps(const vector<string> &vcf_files,
 
     // discover alleles
     vector<GLnexus::range> ranges;
-    if (bedfilename.empty()) {
+    if (rangefilename.empty()) {
         console->warn("Processing full length of {} contigs, as no --bed was provided. Providing a BED file with regions of interest, if applicable, can speed this up.", std::to_string(contigs.size()));
         for (int rid = 0; rid < contigs.size(); ++rid) {
             ranges.push_back(GLnexus::range(rid, 0, contigs[rid].second));
         }
     } else {
-        H("parse the bed file", GLnexus::cli::utils::parse_bed_file(console, bedfilename, contigs, ranges));
+        H("parse the bed file", GLnexus::cli::utils::parse_bed_file(console, rangefilename, contigs, ranges));
     }
     GLnexus::discovered_alleles dsals;
     unsigned sample_count = 0;
@@ -186,7 +187,10 @@ void help(const char* prog) {
          << "Options:" << endl
          << "  --dir DIR, -d DIR              scratch directory path (mustn't already exist; default: ./GLnexus.DB)" << endl
          << "  --config X, -c X               configuration preset name or .yml filename (default: gatk)" << endl
-         << "  --bed FILE, -b FILE            three-column BED file with ranges to analyze (if neither --range nor --bed: use full length of all contigs)" << endl
+         << "  --bed FILE, -b FILE            three-column BED file with ranges to analyze, applied to bgzipped gVCFs "
+                                              "via their tabix indices (if neither --ranges nor --bed: use full length of all contigs)" << endl
+         << "  --ranges FILE, -r FILE          three-column BED file with ranges to analyze, applied internally after "
+                                              "loading gVCFs (if neither --ranges nor --bed: use full length of all contigs)" << endl
          << "  --list, -l                     expect given files to contain lists of gVCF filenames, one per line" << endl << endl
 
          << "  --more-PL, -P                  include PL from reference bands and other cases omitted by default" << endl
@@ -248,6 +252,7 @@ int main(int argc, char *argv[]) {
     bool debug = false;
     bool iter_compare = false;
     string bedfilename;
+    string rangefilename;
     size_t mem_budget = 0, nr_threads = 0;
     size_t bucket_size = GLnexus::BCFKeyValueData::default_bucket_size;
 
@@ -261,7 +266,15 @@ int main(int argc, char *argv[]) {
             case 'b':
                 bedfilename = string(optarg);
                 if (bedfilename.size() == 0) {
-                    cerr <<  "invalid BED filename" << endl;
+                    cerr <<  "invalid BED filename for in-load filtering via tabix indices" << endl;
+                    return 1;
+                }
+                break;
+
+            case 'r':
+                rangefilename = string(optarg);
+                if (rangefilename.size() == 0) {
+                    cerr <<  "invalid BED filename for post-load filtering" << endl;
                     return 1;
                 }
                 break;
@@ -355,6 +368,6 @@ int main(int argc, char *argv[]) {
         vcf_files = vcf_files_precursor;
     }
 
-    return all_steps(vcf_files, bedfilename, dbpath, config_name, more_PL, squeeze, trim_uncalled_alleles,
+    return all_steps(vcf_files, bedfilename, rangefilename, dbpath, config_name, more_PL, squeeze, trim_uncalled_alleles,
                      mem_budget, nr_threads, debug, iter_compare, bucket_size);
 }

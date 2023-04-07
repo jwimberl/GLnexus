@@ -4,6 +4,95 @@
 
 namespace GLnexus {
 
+// Class implementations
+
+// Basic constructor and destroyer
+BcfReader::BcfReader() 
+  : sr(nullptr),
+    nfiles(0),
+    reading(false)
+{
+    sr = bcf_sr_init();
+    if (!sr) {
+        throw std::runtime_error("Could not initialize bcf_srs_t handle");
+    }
+}
+
+BcfReader::~BcfReader() {
+    if (sr) {
+        bcf_sr_destroy(sr);
+    }
+}
+
+// Add region
+void BcfReader::set_regions (const std::string& bedfile, bool overlap) {
+    if (nfiles > 0 || reading) {
+        throw std::runtime_error("set_regions MUST be called before the first call to add_reader");
+    }
+    if (overlap) {
+        //bcf_sr_set_opt(sr, BCF_SR_REGIONS_OVERLAP, 1); // TODO: requires a newer version of htslib
+    }
+    int ret = bcf_sr_set_regions(sr, bedfile.c_str(), 1);
+    if (ret < 0) { // 0 on success, -1 on failure
+        throw std::runtime_error("Could not set reader regions");
+    }
+}
+
+// Add file reader
+void BcfReader::add_reader (const std::string& fname) {
+    if (reading) {
+        throw std::runtime_error("BCF iteration has begun; cannot add new bcfs");
+    }
+    int ret = bcf_sr_add_reader(sr, fname.c_str());
+    if (ret == 0) { // 1 on success, 0 on failure
+        throw std::runtime_error("Could not add reader for file");
+    }
+    ++nfiles;
+}
+
+// Get errnum and string
+bcf_sr_error BcfReader::errnum() const {
+    return sr->errnum;
+}
+std::string BcfReader::errstr() const {
+    return bcf_sr_strerror(sr->errnum);
+}
+
+// Get number of file readers added
+size_t BcfReader::num_files() const {
+    return nfiles;
+}
+
+// Get BCF header
+bcf_hdr_t* BcfReader::get_header(uint32_t idx) const {
+    if (idx > nfiles) {
+        throw std::invalid_argument("Cannot retrieve header; no file with this index belongs to the reader");
+    }
+    return bcf_sr_get_header(sr, idx);
+}
+
+// Go to next record
+bool BcfReader::next() {
+    reading = true; // can no longer add files
+    return bcf_sr_next_line(sr);
+}
+
+// Get data for n-th file, defaulting to 0th for
+// convenience in the common case where only one
+// file is being read
+bcf1_t* BcfReader::get_line(uint32_t idx) const {
+    if (!reading) {
+        // can't start getting lines until calling next(), i.e. in a while loop
+        throw std::invalid_argument("Cannot retrieve record; iteration has not yet begun");
+    }
+    if (idx > nfiles) {
+        throw std::invalid_argument("Cannot retrieve record; no file with this index belongs to the reader");
+    }
+    return bcf_sr_get_line(sr,idx);
+}
+
+// Function definitions
+
 const uint64_t MAX_RECORD_LEN = 100000;
 
 bool gvcf_compatible(const MetadataCache &metadata, const bcf_hdr_t *hdr) {

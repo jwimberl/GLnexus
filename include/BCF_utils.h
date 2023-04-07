@@ -14,87 +14,37 @@ namespace GLnexus {
 class BcfReader {
 public:
     // Basic constructor and destroyer
-    BcfReader() 
-     : sr(nullptr),
-       nfiles(0),
-       reading(false)
-    {
-        sr = bcf_sr_init();
-        if (!sr) {
-            throw std::runtime_error("Could not initialize bcf_srs_t handle");
-        }
-    }
-    ~BcfReader() {
-        if (sr) {
-            bcf_sr_destroy(sr);
-        }
-    }
-    // Add region
-    void set_regions (const std::string& bedfile, bool overlap = false) {
-        if (nfiles > 0 || reading) {
-            throw std::runtime_error("set_regions MUST be called before the first call to add_reader");
-        }
-        if (overlap) {
-            //bcf_sr_set_opt(sr, BCF_SR_REGIONS_OVERLAP, 1); // TODO: requires a newer version of htslib
-        }
-        int ret = bcf_sr_set_regions(sr, bedfile.c_str(), 1);
-        if (ret < 0) { // 0 on success, -1 on failure
-            throw std::runtime_error("Could not set reader regions");
-        }
-    }
+    BcfReader();
+    ~BcfReader();
+
+    // Add bedfile for tabix index filtering
+    void set_regions (const std::string& bedfile, bool overlap = false);
+
     // Add file reader
-    void add_reader (const std::string& fname)  {
-        if (reading) {
-            throw std::runtime_error("BCF iteration has begun; cannot add new bcfs");
-        }
-        int ret = bcf_sr_add_reader(sr, fname.c_str());
-        if (ret == 0) { // 1 on success, 0 on failure
-            throw std::runtime_error("Could not add reader for file");
-        }
-        ++nfiles;
-    }
+    void add_reader (const std::string& fname);
 
     /* CONST STATS */
 
     // Get errnum
-    bcf_sr_error errnum() const {
-        return sr->errnum;
-    }
-    std::string errstr() const {
-        return bcf_sr_strerror(sr->errnum);
-    }
+    bcf_sr_error errnum() const;
+    std::string errstr() const;
+
     // Get number of file readers added
-    size_t num_files() const {
-        return nfiles;
-    }
+    size_t num_files() const;
+
     // Get BCF header
-    bcf_hdr_t* get_header(uint32_t idx = 0) const {
-        if (idx > nfiles) {
-            throw std::invalid_argument("Cannot retrieve header; no file with this index belongs to the reader");
-        }
-        return bcf_sr_get_header(sr, idx);
-    }
+    bcf_hdr_t* get_header(uint32_t idx = 0) const;
 
     /* READING */
 
     // Go to next record
-    bool next() {
-        reading = true; // can no longer add files
-        return bcf_sr_next_line(sr);
-    }
+    bool next();
+
     // Get data for n-th file, defaulting to 0th for
     // convenience in the common case where only one
     // file is being read
-    bcf1_t* get_line(uint32_t idx = 0) const {
-        if (!reading) {
-            // can't start getting lines until calling next(), i.e. in a while loop
-            throw std::invalid_argument("Cannot retrieve record; iteration has not yet begun");
-        }
-        if (idx > nfiles) {
-            throw std::invalid_argument("Cannot retrieve record; no file with this index belongs to the reader");
-        }
-        return bcf_sr_get_line(sr,idx);
-    }
+    bcf1_t* get_line(uint32_t idx = 0) const;
+
 private:
     bcf_srs_t* sr;
     size_t nfiles;

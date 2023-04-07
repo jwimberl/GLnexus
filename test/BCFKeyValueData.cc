@@ -414,7 +414,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
 
         BCFKeyValueData::import_result rslt;
         Status s = data->import_gvcf(*cache, "1", "test/data/discover_alleles_trio1.vcf.gz",
-                                     "test/data/discover_alleles_trio1.regions", rslt);
+                                     "test/data/discover_alleles_trio1.bed", rslt);
         REQUIRE(s.ok());
         REQUIRE(rslt.samples == (set<string>({"trio1.fa", "trio1.mo", "trio1.ch"})));
         REQUIRE(rslt.records == 3);
