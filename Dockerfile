@@ -36,18 +36,16 @@ FROM ubuntu:20.04
 ENV LC_ALL C.UTF-8
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get -qq update && apt-get -qq install -y libjemalloc2 bcftools tabix pv
+RUN apt-get -qq update && apt-get -qq install -y libjemalloc2 bcftools tabix pv libcurl4
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
-COPY --from=build /GLnexus/external/src/htslib/hfile_gcs.so /usr/local/libexec/htslib/
-COPY --from=build /GLnexus/external/src/htslib/hfile_libcurl.so /usr/local/libexec/htslib/
-COPY --from=build /GLnexus/external/src/htslib/hfile_s3.so /usr/local/libexec/htslib/
 COPY --from=builder /GLnexus/glnexus_cli /usr/local/bin/
+COPY --from=builder /GLnexus/external/src/htslib /usr/local/htslib
 ADD https://github.com/mlin/spVCF/releases/download/v1.0.0/spvcf /usr/local/bin/
 RUN chmod +x /usr/local/bin/spvcf
 
 # specify paths needed for htslib plugin loading
-ENV HTS_PATH /GLnexus/external/src/htslib/
-ENV LD_LIBRARY_PATH /GLnexus/external/src/htslib:$LD_LIBRARY_PATH
+ENV HTS_PATH /usr/local/htslib
+ENV LD_LIBRARY_PATH /usr/local/htslib:$LD_LIBRARY_PATH
 
 CMD glnexus_cli
