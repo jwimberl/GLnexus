@@ -60,9 +60,9 @@ ExternalProject_Get_Property(htslib source_dir)
 set(HTSLIB_INCLUDE_DIR ${source_dir}/htslib)
 include_directories(${HTSLIB_INCLUDE_DIR})
 ExternalProject_Get_Property(htslib binary_dir)
-add_library(libhts SHARED IMPORTED)
-set(LIBHTS_SO ${binary_dir}/libhts.so)
-set_property(TARGET libhts PROPERTY IMPORTED_LOCATION ${LIBHTS_SO})
+add_library(libhts STATIC IMPORTED)
+set(LIBHTS_A ${binary_dir}/libhts.a)
+set_property(TARGET libhts PROPERTY IMPORTED_LOCATION ${LIBHTS_A})
 
 # RocksDB
 #
@@ -229,6 +229,7 @@ add_library(libglnexus ALIAS glnexus)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=ivybridge -static-libstdc++")
 
 add_executable(glnexus_cli cli/glnexus_cli.cc)
+set_property(TARGET glnexus_cli PROPERTY ENABLE_EXPORTS 1)
 add_dependencies(glnexus_cli libglnexus)
 target_link_libraries(glnexus_cli PRIVATE glnexus libhts librocksdb libyaml-cpp libz.a libsnappy.a libbz2.a libzstd.a liblzma.a librt.a libcapnp.a libkj.a OpenSSL::SSL ${CMAKE_DL_LIBS} Threads::Threads)
 
