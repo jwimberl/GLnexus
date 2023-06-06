@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.10)
-include(ExternalProject)
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release CACHE STRING
@@ -33,148 +32,60 @@ SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Make PROJECT_SOURCE_DIR, PROJECT_BINARY_DIR, and PROJECT_NAME available.
 project(GLnexus)
 
-INCLUDE(ExternalProject)
-INCLUDE_DIRECTORIES(BEFORE ${CMAKE_BINARY_DIR}/external/include)
-LINK_DIRECTORIES(${CMAKE_BINARY_DIR}/external/lib)
-SET(ENV{PATH} ${CMAKE_BINARY_DIR}/external/bin:$ENV{PATH})
-SET(ENV{PKG_CONFIG_PATH} ${CMAKE_BINARY_DIR}/external/lib/pkgconfig)
+# Dependency directory
+set(EXTERNALDIR /GLnexusBuilder/external)
+INCLUDE_DIRECTORIES(BEFORE ${EXTERNALDIR}/include)
+LINK_DIRECTORIES(${EXTERNALDIR}/lib)
+SET(ENV{PATH} ${EXTERNALDIR}/bin:$ENV{PATH})
+SET(ENV{PKG_CONFIG_PATH} ${EXTERNALDIR}/lib/pkgconfig)
 
 # ssl, threads
 find_package(OpenSSL REQUIRED)
 find_package(Threads)
 
-# After build, double-check external/src/htslib-stamp/htslib-build-out.log
-# to make sure CFLAGS were set as expected
-ExternalProject_Add(htslib
-    URL https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ./configure --prefix=${CMAKE_BINARY_DIR}/external --enable-libcurl --enable-plugins --with-plugin-dir=${CMAKE_BINARY_DIR} --enable-s3
-    PATCH_COMMAND sed -i "s/^CFLAGS .*$/CFLAGS = -gdwarf -O3 -DNDEBUG -march=ivybridge/" Makefile
-    BUILD_IN_SOURCE 1
-    BUILD_COMMAND bash -c "make -n && make -j$(nproc)"
-    INSTALL_COMMAND ""
-    LOG_DOWNLOAD ON
-    LOG_BUILD ON
-  )
-ExternalProject_Get_Property(htslib source_dir)
-set(HTSLIB_INCLUDE_DIR ${source_dir}/htslib)
+# HTSLIB
+set(HTSLIBDIR ${EXTERNALDIR}/src/htslib)
+set(HTSLIB_INCLUDE_DIR ${HTSLIBDIR}/htslib)
 include_directories(${HTSLIB_INCLUDE_DIR})
-ExternalProject_Get_Property(htslib binary_dir)
 add_library(libhts STATIC IMPORTED)
-set(LIBHTS_A ${binary_dir}/libhts.a)
+set(LIBHTS_A ${HTSLIBDIR}/libhts.a)
 set_property(TARGET libhts PROPERTY IMPORTED_LOCATION ${LIBHTS_A})
 
 # RocksDB
-#
-# We set DISABLE_JEMALLOC=1 to avoid link-time dependency to jemalloc; we
-# DO however wish to use jemalloc, but expect user to activate it at
-# runtime with LD_PRELOAD instead.
-#
-# Warning: it's dangerously easy to mess with the RocksDB external project
-# configuration below and silently get a librocksdb.a compiled without
-# optimizations, or targeting an instruction set that's too old or too new.
-#
-# Here are some checks to perform after any adjustment:
-# 1. Verify AVX is used (nonzero results):
-#      objdump -d external/src/rocksdb/librocksdb.a | grep vzeroupper | wc -l
-# 2. Verify Haswell-and-newer instructions are NOT used (zero results):
-#      objdump -d external/src/rocksdb/librocksdb.a | egrep "[[:space:]]andn[[:space:]]"
-# 3. Verify accelerated CRC32 is used (nonzero results):
-#      objdump -d external/src/rocksdb/librocksdb.a | grep crc32q
-# 4. Verify compiler optimizations performed:
-#      (TODO better heuristics needed)
-#      a) check external/src/rocksdb-stamp/rocksdb-build-out.log to see
-#         compiler invocations with -O3
-#      b) go through perf/FlameGraph profiling flow and check that no
-#         rocksdb function has a big chunk like 5% or more
-ExternalProject_Add(rocksdb
-    URL https://github.com/facebook/rocksdb/archive/v6.29.3.tar.gz
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ""
-    BUILD_IN_SOURCE 1
-    BUILD_COMMAND bash -c "export PORTABLE=1 && export DISABLE_JEMALLOC=1 && export OPT='-DNDEBUG -O3 -march=ivybridge -msse4.2 -DHAVE_SSE42 -mpclmul -DROCKSDB_NO_DYNAMIC_EXTENSION' && make -n static_lib && make -j$(nproc) static_lib"
-    INSTALL_COMMAND ""
-    LOG_DOWNLOAD ON
-    LOG_BUILD ON
-  )
-ExternalProject_Get_Property(rocksdb source_dir)
-set(ROCKSDB_INCLUDE_DIR ${source_dir}/include)
+set(ROCKSDBDIR ${EXTERNALDIR}/src/rocksdb)
+set(ROCKSDB_INCLUDE_DIR ${ROCKSDBDIR}/include)
 include_directories(${ROCKSDB_INCLUDE_DIR})
-set(ROCKSDB_UTIL_DIR ${source_dir}/util)
+set(ROCKSDB_UTIL_DIR ${ROCKSDBDIR}/util)
 include_directories(${ROCKSDB_UTIL_DIR})
-ExternalProject_Get_Property(rocksdb binary_dir)
 add_library(librocksdb STATIC IMPORTED)
-set(LIBROCKSDB_A ${binary_dir}/librocksdb.a)
+set(LIBROCKSDB_A ${ROCKSDBDIR}/librocksdb.a)
 set_property(TARGET librocksdb PROPERTY IMPORTED_LOCATION ${LIBROCKSDB_A})
 
-# After build, double-check external/src/yaml-cpp-stamp/yaml-cpp-build-out.log
-# to make sure CFLAGS were set as expected
-ExternalProject_Add(yaml-cpp
-    URL https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.3.zip
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND cmake -DYAML_CPP_BUILD_TOOLS=OFF -DYAML_CPP_BUILD_CONTRIB=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-march=ivybridge .
-    BUILD_IN_SOURCE 1
-    BUILD_COMMAND bash -c "make -j$(nproc)"
-    INSTALL_COMMAND ""
-    LOG_DOWNLOAD ON
-    LOG_BUILD ON
-  )
-ExternalProject_Get_Property(yaml-cpp source_dir)
-set(YAML_CPP_INCLUDE_DIR ${source_dir}/include)
+# yaml-cpp
+set(YAMLCPPDIR ${EXTERNALDIR}/src/yaml-cpp)
+set(YAML_CPP_INCLUDE_DIR ${YAMLCPPDIR}/include)
 include_directories(${YAML_CPP_INCLUDE_DIR})
-ExternalProject_Get_Property(yaml-cpp binary_dir)
 add_library(libyaml-cpp STATIC IMPORTED)
-set(LIBYAML_CPP_A ${binary_dir}/libyaml-cpp.a)
+set(LIBYAML_CPP_A ${YAMLCPPDIR}/libyaml-cpp.a)
 set_property(TARGET libyaml-cpp PROPERTY IMPORTED_LOCATION ${LIBYAML_CPP_A})
 
-ExternalProject_Add(CTPL
-    URL https://github.com/vit-vit/CTPL/archive/v.0.0.2.zip
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ""
-    BUILD_IN_SOURCE 1
-    BUILD_COMMAND ""
-    INSTALL_COMMAND ""
-    LOG_DOWNLOAD ON
-  )
-ExternalProject_Get_Property(CTPL source_dir)
-set(CTPL_INCLUDE_DIR ${source_dir})
+# CTPL
+set(CTPLDIR ${EXTERNALDIR}/src/CTPL)
+set(CTPL_INCLUDE_DIR ${CTPLDIR})
 include_directories(${CTPL_INCLUDE_DIR})
 
-ExternalProject_Add(fcmm
-    URL https://github.com/giacomodrago/fcmm/archive/v1.0.1.zip
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ""
-    BUILD_IN_SOURCE 1
-    BUILD_COMMAND ""
-    INSTALL_COMMAND ""
-    LOG_DOWNLOAD ON
-  )
-ExternalProject_Get_Property(fcmm source_dir)
-set(FCMM_INCLUDE_DIR ${source_dir})
+# fcmm
+set(FCMMDIR ${EXTERNALDIR}/src/fcmm)
+set(FCMM_INCLUDE_DIR ${FCMMDIR})
 include_directories(${FCMM_INCLUDE_DIR})
 
-ExternalProject_Add(spdlog
-    URL https://github.com/gabime/spdlog/archive/v1.8.2.tar.gz
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ""
-    BUILD_IN_SOURCE 1
-    BUILD_COMMAND ""
-    INSTALL_COMMAND ""
-    LOG_DOWNLOAD ON
-  )
-ExternalProject_Get_Property(spdlog source_dir)
-set(SPDLOG_INCLUDE_DIR ${source_dir}/include)
+# spdlog
+set(SPDLOGDIR ${EXTERNALDIR}/src/spdlog)
+set(SPDLOG_INCLUDE_DIR ${SPDLOGDIR}/include)
 include_directories(${SPDLOG_INCLUDE_DIR})
 
-ExternalProject_Add(capnp
-    URL https://capnproto.org/capnproto-c++-0.7.0.tar.gz
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ./configure --prefix=${CMAKE_BINARY_DIR}/external
-    BUILD_IN_SOURCE 1
-    BUILD_COMMAND bash -c "make -j$(nproc) check"
-    INSTALL_COMMAND make install
-    LOG_DOWNLOAD ON
-  )
+# capnp
+set(CAPNPDIR ${EXTERNALDIR}/src/capnp)
 
 execute_process(COMMAND git describe --tags --long --dirty --always
                 OUTPUT_VARIABLE GIT_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -185,6 +96,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-gdwarf -DNDEBUG -O3")
 # Normal Libraries & Executables
 ################################
 set(COMMON_INCLUDES ${PROJECT_SOURCE_DIR}/include)
+include_directories(${COMMON_INCLUDES} ${EXTERNALDIR}/include)
 include_directories(${COMMON_INCLUDES} src)
 include_directories(${COMMON_INCLUDES} src/rocksdb/include)
 include_directories(${COMMON_INCLUDES} capnp/serialize)
@@ -193,7 +105,7 @@ include_directories(${COMMON_INCLUDES} capnp/serialize)
 # definitions.
 add_custom_command(
   OUTPUT  capnp/serialize/defs.capnp.c++ capnp/serialize/defs.capnp.h
-  COMMAND ${CMAKE_BINARY_DIR}/external/bin/capnp compile -I${CMAKE_CURRENT_BINARY_DIR}/external/include -oexternal/bin/capnpc-c++ capnp/serialize/defs.capnp
+  COMMAND ${EXTERNALDIR}/bin/capnp compile -I${EXTERNALDIR}/include -o${EXTERNALDIR}/bin/capnpc-c++ capnp/serialize/defs.capnp
   DEPENDS capnp/serialize/defs.capnp
   COMMENT "GLnexus: generating cap'n proto C++ and H files")
 
@@ -217,13 +129,6 @@ add_library(glnexus
             include/RocksKeyValue.h src/RocksKeyValue.cc
             include/cli_utils.h src/cli_utils.cc
             test/utils.cc)
-add_dependencies(glnexus htslib)
-add_dependencies(glnexus rocksdb)
-add_dependencies(glnexus yaml-cpp)
-add_dependencies(glnexus CTPL)
-add_dependencies(glnexus fcmm)
-add_dependencies(glnexus spdlog)
-add_dependencies(glnexus capnp)
 add_library(libglnexus ALIAS glnexus)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=ivybridge -static-libstdc++")
@@ -239,16 +144,8 @@ install(TARGETS glnexus_cli DESTINATION bin)
 # Testing
 ################################
 
-ExternalProject_Add(catch
-  URL https://github.com/philsquared/Catch/archive/v1.12.2.zip
-  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND ""
-  INSTALL_COMMAND ""
-  LOG_DOWNLOAD ON
-  )
-ExternalProject_Get_Property(catch source_dir)
-include_directories(${source_dir}/single_include)
+set(CATCHDIR ${EXTERNALDIR}/src/catch)
+include_directories(${CATCHDIR}/single_include)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-function")
 add_executable(unit_tests
@@ -265,7 +162,6 @@ add_executable(unit_tests
                 test/unifier.cc
                 test/cli_utils.cc
                 test/cli.cc)
-add_dependencies(unit_tests catch)
 add_dependencies(unit_tests libglnexus)
 target_link_libraries(unit_tests PRIVATE glnexus libhts librocksdb libyaml-cpp libz.a libsnappy.a libbz2.a libzstd.a liblzma.a librt.a libcapnp.a libkj.a OpenSSL::SSL ${CMAKE_DL_LIBS} Threads::Threads)
 

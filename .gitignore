@@ -37,6 +37,7 @@ html/
 CMakeCache.txt
 CMakeFiles/
 /Makefile
+GLnexusBuilder/Makefile
 cmake_install.cmake
 external/
 CTestTestfile.cmake
