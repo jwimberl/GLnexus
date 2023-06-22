@@ -1013,7 +1013,8 @@ static Status bulk_insert_gvcf_key_values(BCFBucketRange& rangeHelper,
 //  sample -> dataset
 //       mapping from sample to dataset, each dataset can store multiple samples.
 //
-static Status import_gvcf_inner(BCFKeyValueData_body *body_,
+static Status import_gvcf_inner(std::shared_ptr<spdlog::logger> logger,
+                                BCFKeyValueData_body *body_,
                                 MetadataCache& metadata,
                                 const string& dataset,
                                 const string& filename,
@@ -1026,11 +1027,14 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
         if (!bedfilename.empty()) {
             vcf.set_regions(bedfilename);
         }
+        logger->info("Adding reader for {}", filename);
         vcf.add_reader(filename);
+        logger->info("Done adding reader for {}", filename);
     } catch(std::exception& e) {
         return Status::IOError("opening gVCF file" , filename + " -- " + e.what() + " -- " + vcf.errstr());
     }
 
+    logger->info("Validating basic facts for {}", filename);
     S(vcf_validate_basic_facts(metadata, dataset, filename, vcf, rslt.samples));
 
     // Atomically verify metadata and prepare
@@ -1038,6 +1042,7 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
         std::lock_guard<std::mutex> lock(body_->mutex);
 
         // verify uniqueness of data set and samples
+        logger->info("Verifying dataset and samples {}", filename);
         S(verify_dataset_and_samples(body_, metadata, dataset, filename, rslt.samples));
 
         // Make sure dataset and samples are not being added by another thread/user
@@ -1051,16 +1056,19 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
                                       sample + " (" + filename + ")");
 
         // Add to active MD
+        logger->info("Adding to active MD {}", filename);
         body_->amd.add(dataset, rslt.samples);
     }
 
     // bulk insert, non atomic
     //
     // Note: we are not dealing at all with mid-flight failures
+    logger->info("Bulk insert gVCF key values {}", filename);
     S(bulk_insert_gvcf_key_values(*body_->rangeHelper, metadata, body_->db,
                                   dataset, filename, vcf, rslt));
 
     // Update metadata atomically, now it will point to all the data
+    logger->info("Update metadata {}", filename);
     Status retval = Status::Invalid();
     {
         std::lock_guard<std::mutex> lock(body_->mutex);
@@ -1104,7 +1112,8 @@ static Status import_gvcf_inner(BCFKeyValueData_body *body_,
     return retval;
 }
 
-Status BCFKeyValueData::import_gvcf(MetadataCache& metadata,
+Status BCFKeyValueData::import_gvcf(std::shared_ptr<spdlog::logger> logger,
+                                    MetadataCache& metadata,
                                     const string& dataset,
                                     const string& filename,
                                     const string& bedfilename,
@@ -1115,7 +1124,8 @@ Status BCFKeyValueData::import_gvcf(MetadataCache& metadata,
         return Status::Invalid("BCFKeyValueData::import_gvcf: invalid data set name", dataset);
     }
 
-    Status s = import_gvcf_inner(body_.get(),
+    Status s = import_gvcf_inner(logger,
+                                 body_.get(),
                                  metadata,
                                  dataset,
                                  filename,

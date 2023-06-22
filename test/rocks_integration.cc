@@ -13,6 +13,8 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
 #include "catch.hpp"
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_sinks.h"
 
 using namespace std;
 using namespace GLnexus;
@@ -21,6 +23,10 @@ using T = BCFKeyValueData;
 
 std::string kDBPathBase = "/tmp/rocksdb_dir";
 static int NUM_LIMIT = 1024 * 1024 * 1024;
+
+namespace {
+    auto console = spdlog::stderr_logger_mt("GLnexusTests");
+}
 
 // generate a random number in the range [0 .. n-1]
 static int gen_rand_number(int n)
@@ -208,7 +214,7 @@ TEST_CASE("RocksDB::import_gvcf") {
 
     SECTION("NA12878D_HiSeqX.21.10009462-10009469.gvcf") {
         set<string> samples_imported;
-        Status s = data->import_gvcf(*cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s.ok());
 
         string dataset;
@@ -236,7 +242,7 @@ TEST_CASE("RocksDB::import_gvcf incompatible") {
 
     SECTION("incompatible contigs") {
         set<string> samples_imported;
-        s = data->import_gvcf(*cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s == StatusCode::INVALID);
     }
 
@@ -257,7 +263,7 @@ TEST_CASE("RocksDB BCF retrieval") {
     REQUIRE(MetadataCache::Start(*data, cache).ok());
     set<string> samples_imported;
 
-    s = data->import_gvcf(*cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
     REQUIRE(s.ok());
 
     SECTION("dataset_header") {
@@ -362,7 +368,7 @@ TEST_CASE("RocksKeyValue prefix mode") {
     REQUIRE(MetadataCache::Start(*data, cache).ok());
     set<string> samples_imported;
 
-    s = data->import_gvcf(*cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
     REQUIRE(s.ok());
 
     SECTION("dataset_range") {
@@ -427,7 +433,7 @@ static void importGVCF(T *data,
                        bool flag) {
     set<string> samples_imported;
     std::string dataset = getBasename(filename);
-    Status s = data->import_gvcf(*cache, dataset, filename, samples_imported);
+    Status s = data->import_gvcf(console, *cache, dataset, filename, samples_imported);
     if (flag)
         assert(s.ok());
     else

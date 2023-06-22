@@ -78,6 +78,7 @@ static int all_steps(const vector<string> &vcf_files,
     if (nr_threads == 0) {
         nr_threads = std::thread::hardware_concurrency();
     }
+    console->info("Using {} threads", nr_threads);
 
     // Load the GVCFs into the database
     unique_ptr<GLnexus::KeyValue::DB> db;
@@ -210,7 +211,7 @@ void help(const char* prog) {
 //
 int main(int argc, char *argv[]) {
     GLnexus::Status s;
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::debug);
     spdlog::set_pattern("[%t] %+");
     #ifdef NDEBUG
     #define BUILD_CONFIG "release"

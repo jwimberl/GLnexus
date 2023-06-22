@@ -1367,18 +1367,27 @@ Status db_get_contigs(std::shared_ptr<spdlog::logger> logger,
                       const string &dbpath,
                       std::vector<std::pair<std::string,size_t> > &contigs) {
     Status s;
-    logger->info("db_get_contigs {}", dbpath);
+    logger->info("db_get_contigs {} size {}", dbpath, contigs.size());
 
     RocksKeyValue::config cfg;
+    logger->info("db_get_contigs 1373");
     cfg.mode = RocksKeyValue::OpenMode::READ_ONLY;
+    logger->info("db_get_contigs 1375");
     cfg.pfx = GLnexus_prefix_spec();
+    logger->info("db_get_contigs 1376");
     unique_ptr<KeyValue::DB> db;
+    logger->info("db_get_contigs 1379");
     S(RocksKeyValue::Open(dbpath, cfg, db));
     {
+        logger->info("db_get_contigs 1382");
         unique_ptr<BCFKeyValueData> data;
+        logger->info("db_get_contigs 1384");
         S(BCFKeyValueData::Open(db.get(), data));
+        logger->info("db_get_contigs 1386");
         S(data->contigs(contigs));
+        logger->info("db_get_contigs 1388");
     }
+    logger->info("db_get_contigs 1390");
 
     return Status::OK();
 }
@@ -1392,6 +1401,7 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
                     std::unique_ptr<KeyValue::DB> *db_out, // output
                     bool delete_gvcf_after_load) {
     Status s;
+    logger->info("db_bulk_load {}", dbpath);
 
     if (nr_threads == 0) {
         nr_threads = std::thread::hardware_concurrency();
@@ -1437,9 +1447,11 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
             }
         }
 
+        logger->info("Adding loading task for {} to threadpool ...", gvcf);
         auto fut = threadpool.push([&, gvcf, dataset](int tid) {
                 BCFKeyValueData::import_result rslt;
-                Status ls = data->import_gvcf(*metadata, dataset, gvcf, bedfilename, rslt);
+                logger->info("Loading {} ...", gvcf);
+                Status ls = data->import_gvcf(logger, *metadata, dataset, gvcf, bedfilename, rslt);
                 if (ls.ok()) {
                     if (delete_gvcf_after_load && unlink(gvcf.c_str())) {
                         logger->warn("Loaded {} successfully, but failed deleting it afterwards.", gvcf);
@@ -1455,6 +1467,7 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
                         logger->info("{}/{} ({})...", n, gvcfs.size(), dataset);
                     }
                 }
+                logger->info("Done loading {}", gvcf);
                 return ls;
             });
         statuses.push_back(move(fut));
@@ -1464,6 +1477,7 @@ Status db_bulk_load(std::shared_ptr<spdlog::logger> logger,
     // collect results
     vector<pair<string,Status>> failures;
     for (size_t i = 0; i < gvcfs.size(); i++) {
+        logger->info("Wating on loading task {}", gvcfs[i]);
         Status s_i(move(statuses[i].get()));
         if (!s_i.ok()) {
             failures.push_back(make_pair(gvcfs[i],move(s_i)));

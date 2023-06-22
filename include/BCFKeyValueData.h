@@ -4,6 +4,8 @@
 #include "KeyValue.h"
 #include "BCFSerialize.h"
 
+#include "spdlog/spdlog.h"
+
 namespace GLnexus {
 
 struct BCFKeyValueData_body;
@@ -112,17 +114,19 @@ public:
     /// All samples are immediately added to the sample set "*"
     /// If range_filter is nonempty, then import only records overlapping one
     /// of those ranges.
-    Status import_gvcf(MetadataCache& metadata, const std::string& dataset,
+    Status import_gvcf(std::shared_ptr<spdlog::logger> logger,
+                       MetadataCache& metadata, const std::string& dataset,
                        const std::string& filename,
                        const std::string& bedfilename,
                        import_result& rslt);
 
-    Status import_gvcf(MetadataCache& metadata, const std::string& dataset,
+    Status import_gvcf(std::shared_ptr<spdlog::logger> logger,
+                       MetadataCache& metadata, const std::string& dataset,
                        const std::string& filename,
                        std::set<std::string>& samples_imported) {
         import_result rslt;
         std::string empty_bedfile = "";
-        Status s = import_gvcf(metadata, dataset, filename, empty_bedfile, rslt);
+        Status s = import_gvcf(logger, metadata, dataset, filename, empty_bedfile, rslt);
         samples_imported = move(rslt.samples);
         return s;
     }

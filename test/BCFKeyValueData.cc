@@ -6,8 +6,14 @@
 #include "compare_queries.h"
 #include "catch.hpp"
 #include "ctpl_stl.h"
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_sinks.h"
 using namespace std;
 using namespace GLnexus;
+
+namespace {
+    auto console = spdlog::stderr_logger_mt("GLnexusTests");
+}
 
 // Trivial in-memory KeyValue implementation used in unit tests.
 namespace KeyValueMem {
@@ -277,7 +283,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
     }
 
     SECTION("NA12878D_HiSeqX.21.10009462-10009469.gvcf") {
-        Status s = data->import_gvcf(*cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s.ok());
         REQUIRE(samples_imported.size() == 1);
         REQUIRE(*(samples_imported.begin()) == "NA12878");
@@ -313,7 +319,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
     }
 
     SECTION("all_samples_sampleset") {
-        Status s = data->import_gvcf(*cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
         REQUIRE(s.ok());
 
         REQUIRE(cache->sample_count(ct).ok());
@@ -340,7 +346,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
         REQUIRE(sampleset == sampleset2);
 
 
-        s = data->import_gvcf(*cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
         REQUIRE(s.ok());
 
         REQUIRE(cache->sample_count(ct).ok());
@@ -372,7 +378,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
         REQUIRE(T::Open(&db, data).ok());
         REQUIRE(MetadataCache::Start(*data, cache).ok());
 
-        Status s = data->import_gvcf(*cache, "1", "test/data/discover_alleles_trio1.vcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "1", "test/data/discover_alleles_trio1.vcf", samples_imported);
         REQUIRE(s.ok());
         REQUIRE(samples_imported.size() == 3);
 
@@ -388,7 +394,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
         REQUIRE(s.ok());
         REQUIRE(all->size() == 3);
 
-        s = data->import_gvcf(*cache, "2", "test/data/discover_alleles_trio2.vcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "2", "test/data/discover_alleles_trio2.vcf", samples_imported);
         REQUIRE(s.ok());
         REQUIRE(samples_imported.size() == 3);
 
@@ -413,7 +419,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
         REQUIRE(MetadataCache::Start(*data, cache).ok());
 
         BCFKeyValueData::import_result rslt;
-        Status s = data->import_gvcf(*cache, "1", "test/data/discover_alleles_trio1.vcf.gz",
+        Status s = data->import_gvcf(console, *cache, "1", "test/data/discover_alleles_trio1.vcf.gz",
                                      "test/data/discover_alleles_trio1.bed", rslt);
         REQUIRE(s.ok());
         REQUIRE(rslt.samples == (set<string>({"trio1.fa", "trio1.mo", "trio1.ch"})));
@@ -421,10 +427,10 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
     }
 
     SECTION("new_sampleset") {
-        Status s = data->import_gvcf(*cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
         REQUIRE(s.ok());
 
-        s = data->import_gvcf(*cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
         REQUIRE(s.ok());
 
         s = data->new_sampleset(*cache, "x", set<string>{"HX0001"});
@@ -468,7 +474,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
         REQUIRE(s.ok());
 
         REQUIRE(MetadataCache::Start(*data, cache).ok());
-        s = data->import_gvcf(*cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s == StatusCode::INVALID);
 
         // * sample set version number should NOT change
@@ -486,7 +492,7 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
         REQUIRE(s.ok());
 
         REQUIRE(MetadataCache::Start(*data, cache).ok());
-        s = data->import_gvcf(*cache, "NA12878D", "test/data/bogus_END.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "NA12878D", "test/data/bogus_END.gvcf", samples_imported);
         REQUIRE(s == StatusCode::INVALID);
 
         // * sample set version number should NOT change
@@ -498,10 +504,10 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
     }
 
     SECTION("reject duplicate data set") {
-        Status s = data->import_gvcf(*cache, "x", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "x", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s.ok());
 
-        s = data->import_gvcf(*cache, "x", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "x", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s == StatusCode::EXISTS);
 
         KeyValue::CollectionHandle coll;
@@ -512,10 +518,10 @@ TEST_CASE("BCFKeyValueData::import_gvcf") {
     }
 
     SECTION("reject duplicate sample") {
-        Status s = data->import_gvcf(*cache, "y", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "y", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s.ok());
 
-        s = data->import_gvcf(*cache, "z", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "z", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
         REQUIRE(s == StatusCode::EXISTS);
 
         KeyValue::CollectionHandle coll;
@@ -536,7 +542,7 @@ TEST_CASE("BCFKeyValueData BCF retrieval") {
     REQUIRE(MetadataCache::Start(*data, cache).ok());
     set<string> samples_imported;
 
-    Status s = data->import_gvcf(*cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
+    Status s = data->import_gvcf(console, *cache, "NA12878D", "test/data/NA12878D_HiSeqX.21.10009462-10009469.gvcf", samples_imported);
     REQUIRE(s.ok());
 
     SECTION("dataset_header") {
@@ -653,7 +659,7 @@ TEST_CASE("BCFKeyValueData range overlap with a single dataset") {
         REQUIRE(MetadataCache::Start(*data, cache).ok());
         set<string> samples_imported;
 
-        Status s = data->import_gvcf(*cache, "synth_A", "test/data/synthetic_A.21.gvcf", samples_imported);
+        Status s = data->import_gvcf(console, *cache, "synth_A", "test/data/synthetic_A.21.gvcf", samples_imported);
         if (s.bad()) {
             cout << s.str() << endl;
         }
@@ -725,7 +731,7 @@ TEST_CASE("BCFKeyValueData long_confidence_intervals") {
         REQUIRE(MetadataCache::Start(*data, cache).ok());
         set<string> samples_imported;
 
-        Status s = data->import_gvcf(*cache, "long_ref", "test/data/long_ref_intervals_A.gvcf",
+        Status s = data->import_gvcf(console, *cache, "long_ref", "test/data/long_ref_intervals_A.gvcf",
                                      samples_imported);
         if (s.bad()) {
             cout << s.str() << endl;
@@ -781,10 +787,10 @@ TEST_CASE("BCFKeyValueData long_confidence_intervals 2") {
         REQUIRE(MetadataCache::Start(*data, cache).ok());
         set<string> samples_imported;
 
-        Status s = data->import_gvcf(*cache, "A", "test/data/long_ref_intervals_A.gvcf",
+        Status s = data->import_gvcf(console, *cache, "A", "test/data/long_ref_intervals_A.gvcf",
                                      samples_imported);
         REQUIRE(s.ok());
-        s = data->import_gvcf(*cache, "B", "test/data/long_ref_intervals_B.gvcf", samples_imported);
+        s = data->import_gvcf(console, *cache, "B", "test/data/long_ref_intervals_B.gvcf", samples_imported);
         REQUIRE(s.ok());
 
         size_t ct;
@@ -872,9 +878,9 @@ TEST_CASE("BCFData::sampleset_range") {
     REQUIRE(MetadataCache::Start(*data, cache).ok());
     set<string> samples_imported;
 
-    Status s = data->import_gvcf(*cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
+    Status s = data->import_gvcf(console, *cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
     REQUIRE(s.ok());
-    s = data->import_gvcf(*cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
     REQUIRE(s.ok());
 
     size_t ct;
@@ -1083,11 +1089,11 @@ TEST_CASE("BCFKeyValueData::sampleset_range") {
     REQUIRE(MetadataCache::Start(*data, cache).ok());
     set<string> samples_imported;
 
-    Status s = data->import_gvcf(*cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
+    Status s = data->import_gvcf(console, *cache, "1", "test/data/sampleset_range1.gvcf", samples_imported);
     REQUIRE(s.ok());
-    s = data->import_gvcf(*cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "2", "test/data/sampleset_range2.gvcf", samples_imported);
     REQUIRE(s.ok());
-    s = data->import_gvcf(*cache, "3", "test/data/sampleset_range3.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "3", "test/data/sampleset_range3.gvcf", samples_imported);
     REQUIRE(s.ok());
 
     size_t ct;
@@ -1355,11 +1361,11 @@ TEST_CASE("BCFKeyValueData compare iterator implementations") {
     REQUIRE(MetadataCache::Start(*data, cache).ok());
     set<string> samples_imported;
 
-    Status s = data->import_gvcf(*cache, "1", "test/data/sampleset_rnd1.gvcf", samples_imported);
+    Status s = data->import_gvcf(console, *cache, "1", "test/data/sampleset_rnd1.gvcf", samples_imported);
     REQUIRE(s.ok());
-    s = data->import_gvcf(*cache, "2", "test/data/sampleset_rnd2.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "2", "test/data/sampleset_rnd2.gvcf", samples_imported);
     REQUIRE(s.ok());
-    s = data->import_gvcf(*cache, "3", "test/data/sampleset_range3.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "3", "test/data/sampleset_range3.gvcf", samples_imported);
     REQUIRE(s.ok());
 
 
@@ -1420,37 +1426,37 @@ TEST_CASE("BCFKeyValueData::import_gvcf input validation") {
     set<string> samples_imported;
 
     // empty allele structure
-    Status s = data->import_gvcf(*cache, "bad", "test/data/bad_dna.gvcf", samples_imported);
+    Status s = data->import_gvcf(console, *cache, "bad", "test/data/bad_dna.gvcf", samples_imported);
     REQUIRE(s.bad());
 
     // bad letter (K)
-    s = data->import_gvcf(*cache, "bad", "test/data/bad_dna2.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "bad", "test/data/bad_dna2.gvcf", samples_imported);
     REQUIRE(s.bad());
     REQUIRE(s.str().find("ZCCAT") != string::npos); // note: a prior record with an IUPAC-letter REF was accepted
 
     // wrong contig size, does not match DB
-    s = data->import_gvcf(*cache, "bad", "test/data/bad_dna3.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "bad", "test/data/bad_dna3.gvcf", samples_imported);
     REQUIRE(s.bad());
 
     // empty allele
-    s = data->import_gvcf(*cache, "bad", "test/data/bad_dna4.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "bad", "test/data/bad_dna4.gvcf", samples_imported);
     REQUIRE(s.bad());
 
     // bad sample name
-    s = data->import_gvcf(*cache, "bad", "test/data/bad_sample.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "bad", "test/data/bad_sample.gvcf", samples_imported);
     REQUIRE(s.bad());
     REQUIRE(s.str().find("sample name") != string::npos);
 
     // bad data set name
-    s = data->import_gvcf(*cache, "bad/", "test/data/bad_sample.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "bad/", "test/data/bad_sample.gvcf", samples_imported);
     REQUIRE(s.bad());
     REQUIRE(s.str().find("data set name") != string::npos);
-    s = data->import_gvcf(*cache, "", "test/data/bad_sample.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "", "test/data/bad_sample.gvcf", samples_imported);
     REQUIRE(s.bad());
     REQUIRE(s.str().find("data set name") != string::npos);
 
     // bad # of samples / truncated record
-    s = data->import_gvcf(*cache, "bad_nsample", "test/data/bad_nsample.gvcf", samples_imported);
+    s = data->import_gvcf(console, *cache, "bad_nsample", "test/data/bad_nsample.gvcf", samples_imported);
     REQUIRE(s.bad());
     REQUIRE(s.str().find("VCF parse error") != string::npos);
 }
@@ -1480,7 +1486,7 @@ TEST_CASE("BCFKeyValueData NA12878 import and query") {
     REQUIRE(MetadataCache::Start(*data, cache).ok());
     set<string> samples_imported;
 
-    Status s = data->import_gvcf(*cache, "NA12878", "test/data/NA12878.g.vcf.gz", samples_imported);
+    Status s = data->import_gvcf(console, *cache, "NA12878", "test/data/NA12878.g.vcf.gz", samples_imported);
     REQUIRE(s.ok());
 
     ctpl::thread_pool threadpool;
