@@ -36,6 +36,10 @@ void BcfReader::set_regions (const std::string& bedfile, bool overlap) {
     if (ret < 0) { // 0 on success, -1 on failure
         throw std::runtime_error("Could not set reader regions");
     }
+    ret = bcf_sr_set_targets(sr, bedfile.c_str(), 1, 0);
+    if (ret < 0) { // 0 on success, -1 on failure
+        throw std::runtime_error("Could not set reader targets");
+    }
 }
 
 // Add file reader
