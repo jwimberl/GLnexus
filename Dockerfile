@@ -1,7 +1,7 @@
 # Dockerfile for building GLnexus. The resulting container image runs the unit tests
 # by default. It has in its working directory the statically linked glnexus_cli
 # executable which can be copied out.
-FROM glnexus_builder as glnexus_cli
+FROM glnexus_builder as glnexus_cli_building
 ENV LC_ALL C.UTF-8
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
@@ -15,8 +15,8 @@ WORKDIR /GLnexus
 RUN cmake -DCMAKE_BUILD_TYPE=$build_type . && make -j4
 
 # specify paths needed for htslib plugin loading
-ENV HTS_PATH /GLnexus/external/src/htslib/
-ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/GLnexus/external/src/htslib
+ENV HTS_PATH /GLnexusBuilder/external/src/htslib/
+ENV LD_LIBRARY_PATH $LD_LIBRARY_PATH:/GLnexusBuilder/external/src/htslib
 
 # set up default container start to run tests
 CMD ctest -V
@@ -30,8 +30,8 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get -qq update && apt-get -qq install -y libjemalloc2 bcftools tabix pv libcurl4
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
-COPY --from=glnexus_cli /GLnexus/glnexus_cli /usr/local/bin/
-COPY --from=glnexus_cli /GLnexus/external/src/htslib /usr/local/htslib
+COPY --from=glnexus_cli_building /GLnexus/glnexus_cli /usr/local/bin/
+COPY --from=glnexus_cli_building /GLnexusBuilder/external/src/htslib /usr/local/htslib
 ADD https://github.com/mlin/spVCF/releases/download/v1.0.0/spvcf /usr/local/bin/
 RUN chmod +x /usr/local/bin/spvcf
 
